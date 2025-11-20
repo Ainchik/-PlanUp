@@ -7,13 +7,13 @@ from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                              QLineEdit, QMessageBox, QTextEdit, QDialog, QComboBox,
                              QSpinBox, QGroupBox, QCheckBox)
 from PyQt6.QtCore import QDate, Qt, QTimer, QDateTime
-from PyQt6.QtGui import QColor, QTextCharFormat, QFont, QPainter, QBrush
+from PyQt6.QtGui import QColor, QPainter, QBrush
 
 
 class CalendarApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PlanUp")
+        self.setWindowTitle("Plan Up")
         self.tasks = {}  # словарь для хранения задач: {дата: [список задач]}
         self.notes = {}  # словарь для хранения заметок: {дата: {индекс_задачи: текст_заметки}}
         self.notifications = {}  # словарь для хранения уведомлений: {дата: {индекс_задачи: настройки}}
@@ -22,16 +22,32 @@ class CalendarApp(QWidget):
 
         self.notification_timer = QTimer()
         self.notification_timer.timeout.connect(self.check_notifications)
-        self.notification_timer.start(60000)  # проверка каждую минуту
+        self.notification_timer.start(6000)  # проверка каждую минуту
 
         self.showMaximized()
         self.initUI()
 
     def initUI(self):
+        # устанавливаем общий стиль приложения
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #5cb1e6;
+                color: #125782;
+            }
+        """)
+
         main_layout = QVBoxLayout()
         splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # создаем основной контейнер для календаря с заголовком
+        self.calendar = CustomCalendarWidget(self)
+        self.calendar.setSelectedDate(QDate.currentDate())
+        self.calendar.selectionChanged.connect(self.on_date_selected)
+
+        self.calendar = CustomCalendarWidget(self)
+        self.calendar.setSelectedDate(QDate.currentDate())
+        self.calendar.selectionChanged.connect(self.on_date_selected)
+
+        # создаём основной контейнер для календаря с заголовком
         calendar_main_frame = QFrame()
         calendar_main_layout = QVBoxLayout(calendar_main_frame)
 
@@ -40,30 +56,51 @@ class CalendarApp(QWidget):
         self.calendar.setSelectedDate(QDate.currentDate())
         self.calendar.selectionChanged.connect(self.on_date_selected)
 
-        # настраиваем формат для сегодняшней даты
-        today_fmt = QTextCharFormat()
-        today_fmt.setBackground(QColor(0, 184, 217))  # зелёный фон с прозрачностью
-        today_fmt.setForeground(QColor(255, 255, 255))  # белый текст
-        today_fmt.setFontWeight(QFont.Weight.Bold)  # толщина начертания шрифта
-        self.calendar.setDateTextFormat(QDate.currentDate(), today_fmt)  # изменение формата даты
-
-        # изменяем формат заголовка
-        header_fmt = QTextCharFormat()
-        header_fmt.setBackground(QColor(0, 0, 255))
-        header_fmt.setForeground(Qt.GlobalColor.white)
-        self.calendar.setHeaderTextFormat(header_fmt)
+        calendar_main_layout.addWidget(self.calendar)
 
         # отображение задач
         self.tasks_frame = QFrame()
+        self.tasks_frame.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border: 2px solid #b0e0e6;
+                border-radius: 10px;
+                margin: 5px;
+            }
+        """)
+
         tasks_layout = QVBoxLayout()
 
-        # создаем кнопки
+        # создаём кнопки
         self.btn_add = QPushButton('Добавить')
         self.btn_add.clicked.connect(self.add_task)
+        self.btn_add.setStyleSheet("""
+            QPushButton {
+                font-size: 14px;
+                padding: 10px;
+                background-color: #6dc3e8;
+                color: #2c3e50;
+                border: 2px solid #53aed5;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff91a4;
+            }
+            QPushButton:pressed {
+                background-color: #ff91a4;
+            }
+        """)
 
         # текст с информацией о задачах
         self.tasks_label = QLabel("Задач пока нет")
         self.tasks_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.tasks_label.setStyleSheet("""
+            font-size: 16px; 
+            padding: 20px;
+            color: #7f8c8d;
+            font-style: italic;
+        """)
 
         # контейнер для отображения задач
         self.tasks_container = QVBoxLayout()
@@ -73,7 +110,6 @@ class CalendarApp(QWidget):
         tasks_layout.addWidget(self.tasks_label)
         tasks_layout.addLayout(self.tasks_container)
 
-        self.tasks_label.setStyleSheet("padding: 20px;")
         self.tasks_frame.setLayout(tasks_layout)
 
         # добавляем виджеты в сплиттер
@@ -139,11 +175,11 @@ class CalendarApp(QWidget):
         goal_widget = QWidget()
         goal_widget.setStyleSheet("""
             QWidget {
-                background-color: rgb(0, 0, 255);
-                border: 2px solid #ffeaa7;
-                border-radius: 8px;
-                padding: 10px;
-                margin: 5px;
+                background-color: ;
+                border: 2px solid #87ceeb;
+                border-radius: 10px;
+                padding: 12px;
+                margin: 8px;
             }
         """)
 
@@ -151,25 +187,56 @@ class CalendarApp(QWidget):
 
         # заголовок цели
         goal_header = QLabel("🎯 АКТИВНАЯ ЦЕЛЬ")
+        goal_header.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            color: #2c3e50;
+            background-color: #ffb6c1;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        """)
 
         # текст цели
         goal_text = QLabel(goal_data['goal_text'])
         goal_text.setWordWrap(True)
+        goal_text.setStyleSheet("font-size: 14px; color: #2c3e50; margin: 5px 0;")
 
         # причина
         reason_text = QLabel(f"💡 Почему важно: {goal_data['reason_text']}")
         reason_text.setWordWrap(True)
+        reason_text.setStyleSheet("font-size: 14px; color: #34495e; margin: 5px 0;")
 
         # период
         start_date = QDate.fromString(goal_data['start_date'], Qt.DateFormat.ISODate)
         end_date = QDate.fromString(goal_data['end_date'], Qt.DateFormat.ISODate)
         period_text = QLabel(f"📅 Период: {start_date.toString('dd.MM.yy')} - {end_date.toString('dd.MM.yy')}")
+        period_text.setStyleSheet("font-size: 14px; color: #7f8c8d; margin: 5px 0;")
 
         # кнопки
         buttons_layout = QHBoxLayout()
         note_btn = QPushButton('Заметка')
         stop_btn = QPushButton('Остановить')
         edit_notifications_btn = QPushButton('Напоминания')
+
+        # Устанавливаем стиль для кнопок
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 8px; 
+                margin: 2px;
+                background-color: #b0e0e6;
+                color: #2c3e50;
+                border: 1px solid #6dc3e8;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #87ceeb;
+            }
+        """
+        note_btn.setStyleSheet(button_style)
+        stop_btn.setStyleSheet(button_style)
+        edit_notifications_btn.setStyleSheet(button_style)
 
         note_btn.clicked.connect(lambda: self.show_goal_note_dialog(goal_data['id']))
         stop_btn.clicked.connect(lambda: self.stop_goal(goal_data['id']))
@@ -190,39 +257,53 @@ class CalendarApp(QWidget):
 
     def create_task_widget(self, task_text, task_index):
         task_widget = QWidget()
+        task_widget.setStyleSheet("""
+            QWidget {
+                background-color: #f8f9fa;
+                border: 1px solid #dce6f0;
+                border-radius: 8px;
+                margin: 4px;
+                padding: 2px;
+            }
+        """)
+
         task_layout = QHBoxLayout()
 
-        # Проверяем выполнена ли задача
+        # проверяем выполнена ли задача
         is_completed = self.is_task_completed(task_index)
 
-        # Создаем кликабельную метку для отметки выполнения
+        # создаём кликабельную метку для отметки выполнения
         task_label = QLabel(task_text)
         task_label.setWordWrap(True)
         task_label.mousePressEvent = lambda event: self.toggle_task_completion(task_index)
 
-        # Стиль для выполненных задач
+        # стиль для выполненных задач
         if is_completed:
             task_label.setStyleSheet("""
                 QLabel {
                     text-decoration: line-through;
-                    color: gray;
-                    background-color: #e8f5e8;
-                    padding: 5px;
-                    border-radius: 3px;
+                    color: #95a5a6;
+                    background-color: #ecf0f1;
+                    padding: 8px;
+                    border-radius: 6px;
+                    font-size: 14px;
                 }
             """)
         else:
             task_label.setStyleSheet("""
                 QLabel {
-                    padding: 5px;
-                    border-radius: 3px;
+                    padding: 8px;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    color: #2c3e50;
+                    background-color: #ffffff;
                 }
                 QLabel:hover {
-                    background-color: #f0f0f0;
+                    background-color: #e8f4f8;
                 }
             """)
 
-        # Проверяем есть ли заметка для этой задачи
+        # проверяем есть ли заметка для этой задачи
         has_note = self.has_note_for_task(task_index)
         note_indicator = " 📌" if has_note else ""
 
@@ -230,6 +311,26 @@ class CalendarApp(QWidget):
         delete_btn = QPushButton('Удалить')
         modify_btn = QPushButton('Изменить')
         notifications_btn = QPushButton('🔔')
+
+        # устанавливаем стиль для кнопок
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 8px; 
+                margin: 2px;
+                background-color: #ffd1dc;
+                color: #2c3e50;
+                border: 1px solid #ffb6c1;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #ffb6c1;
+            }
+        """
+        note_btn.setStyleSheet(button_style)
+        delete_btn.setStyleSheet(button_style)
+        modify_btn.setStyleSheet(button_style)
+        notifications_btn.setStyleSheet(button_style)
 
         # подключаем кнопки к функциям
         note_btn.clicked.connect(lambda: self.show_note_dialog(task_index))
@@ -462,13 +563,53 @@ class CalendarApp(QWidget):
     def show_goal_notification(self, goal_data):
         # показывает уведомление для цели
         message = f"🎯 Напоминание о цели:\n\n{goal_data['goal_text']}\n\n💡 Почему это важно:\n{goal_data['reason_text']}"
-        QMessageBox.information(self, "Напоминание о цели", message)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Напоминание о цели")
+        msg_box.setText(message)
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+            QMessageBox QPushButton {
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                padding: 8px 16px;
+                border: 1px solid #ff91a4;
+                border-radius: 6px;
+                font-size: 14px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #ff91a4;
+            }
+        """)
+        msg_box.exec()
 
     def show_task_notification(self, date_str, task_index):
         # показывает уведомление для задачи
         task_text = self.tasks[date_str][task_index]
         message = f"📝 Напоминание о задаче:\n\n{task_text}"
-        QMessageBox.information(self, "Напоминание о задаче", message)
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Напоминание о задаче")
+        msg_box.setText(message)
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+            QMessageBox QPushButton {
+                background-color: #b0e0e6;
+                color: #2c3e50;
+                padding: 8px 16px;
+                border: 1px solid #87ceeb;
+                border-radius: 6px;
+                font-size: 14px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #87ceeb;
+            }
+        """)
+        msg_box.exec()
 
     def get_dates_with_tasks(self):
         # возвращает список дат, на которых есть задачи
@@ -479,6 +620,55 @@ class CustomCalendarWidget(QCalendarWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_app = parent
+        self.setStyleSheet("""
+            QCalendarWidget {
+                background-color: #ffffff;
+                border: 2px solid #b0e0e6;
+                border-radius: 10px;
+                font-size: 16px;
+            }
+            QCalendarWidget QWidget {
+                alternate-background-color: #f8f9fa;
+                font-size: 16px;
+            }
+            QCalendarWidget QToolButton {
+                font-size: 16px;
+                padding: 8px;
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                border: 1px solid #ff91a4;
+                border-radius: 6px;
+            }
+            QCalendarWidget QToolButton:hover {
+                background-color: #ff91a4;
+            }
+            QCalendarWidget QMenu {
+                font-size: 14px;
+                background-color: #ffffff;
+                color: #2c3e50;
+            }
+            QCalendarWidget QSpinBox {
+                font-size: 14px;
+                padding: 4px;
+                background-color: #ffffff;
+                color: #2c3e50;
+                border: 1px solid #b0e0e6;
+                border-radius: 4px;
+            }
+            QCalendarWidget QTableView {
+                background-color: #ffffff;
+                alternate-background-color: #f0f8ff;
+                selection-background-color: #ffb6c1;
+            }
+            QCalendarWidget QTableView::item {
+                padding: 8px;
+                border: 1px solid #e0f0ff;
+            }
+            QCalendarWidget QTableView::item:selected {
+                background-color: #ffb6c1;
+                color: #2c3e50;
+            }
+        """)
 
     def paintCell(self, painter, rect, date):
         super().paintCell(painter, rect, date)
@@ -487,7 +677,7 @@ class CustomCalendarWidget(QCalendarWidget):
         date_str = date.toString(Qt.DateFormat.ISODate)
         if date_str in self.parent_app.tasks and self.parent_app.tasks[date_str]:
             # рисуем маленький кружок в правом нижнем углу
-            dot_size = 6
+            dot_size = 8
             dot_rect = rect.adjusted(
                 rect.width() - dot_size - 2,
                 rect.height() - dot_size - 2,
@@ -496,7 +686,7 @@ class CustomCalendarWidget(QCalendarWidget):
 
             painter.save()
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setBrush(QBrush(QColor(255, 0, 0)))  # красный кружок
+            painter.setBrush(QBrush(QColor(255, 105, 180)))  # ярко-розовый кружок
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(dot_rect)
             painter.restore()
@@ -511,20 +701,59 @@ class NoteDialog(QDialog):
     def initUI(self, task_text, current_note):
         self.setWindowTitle(f"Заметка: {task_text}")
         self.resize(500, 400)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+        """)
 
         layout = QVBoxLayout()
 
         # поле для заметки
         self.note_label = QLabel("Заметка:")
+        self.note_label.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            margin-bottom: 10px;
+            color: #2c3e50;
+        """)
+
         self.note_input = QTextEdit()
         self.note_input.setPlainText(current_note)
         self.note_input.setPlaceholderText("Введите ваши заметки здесь...")
+        self.note_input.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 2px solid #b0e0e6;
+            border-radius: 8px;
+            padding: 10px;
+        """)
 
         # создаём кнопки 2
         buttons_layout = QHBoxLayout()
         self.save_btn = QPushButton("Сохранить")
         self.cancel_btn = QPushButton("Отмена")
         self.clear_btn = QPushButton("Очистить")
+
+        # Устанавливаем стиль для кнопок
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 10px 20px;
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                border: 2px solid #ff91a4;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff91a4;
+            }
+        """
+        self.save_btn.setStyleSheet(button_style)
+        self.cancel_btn.setStyleSheet(button_style)
+        self.clear_btn.setStyleSheet(button_style)
 
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
@@ -556,29 +785,74 @@ class GoalNotificationDialog(QDialog):
     def initUI(self):
         self.setWindowTitle("Настройка уведомлений для цели")
         self.resize(400, 300)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+        """)
 
         layout = QVBoxLayout()
 
         # группа настроек уведомлений
         notification_group = QGroupBox("Настройки уведомлений")
+        notification_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #e6f3ff;
+                border: 2px solid #87ceeb;
+                border-radius: 8px;
+                padding: 10px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #2c3e50;
+            }
+        """)
+
         notification_layout = QVBoxLayout()
 
         # включение уведомлений
         self.enable_checkbox = QCheckBox("Включить уведомления")
+        self.enable_checkbox.setStyleSheet("font-size: 14px; color: #2c3e50;")
         self.enable_checkbox.setChecked(self.goal_data.get('notifications', {}).get('enabled', False))
 
         # интервал уведомлений
         interval_layout = QHBoxLayout()
-        interval_layout.addWidget(QLabel("Интервал:"))
+        interval_label = QLabel("Интервал:")
+        interval_label.setStyleSheet("font-size: 14px; color: #2c3e50;")
+        interval_layout.addWidget(interval_label)
+
         self.interval_combo = QComboBox()
         self.interval_combo.addItems(["Ежедневно", "Каждые 2 дня", "Еженедельно"])
+        self.interval_combo.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 1px solid #b0e0e6;
+            border-radius: 4px;
+            padding: 4px;
+        """)
         interval_layout.addWidget(self.interval_combo)
         interval_layout.addStretch()
 
         # время уведомления
         time_layout = QHBoxLayout()
-        time_layout.addWidget(QLabel("Время:"))
+        time_label = QLabel("Время:")
+        time_label.setStyleSheet("font-size: 14px; color: #2c3e50;")
+        time_layout.addWidget(time_label)
+
         self.time_combo = QComboBox()
+        self.time_combo.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 1px solid #b0e0e6;
+            border-radius: 4px;
+            padding: 4px;
+        """)
         for hour in range(8, 22):
             self.time_combo.addItem(f"{hour:02d}:00")
         time_layout.addWidget(self.time_combo)
@@ -593,6 +867,23 @@ class GoalNotificationDialog(QDialog):
         buttons_layout = QHBoxLayout()
         self.save_btn = QPushButton("Сохранить")
         self.cancel_btn = QPushButton("Отмена")
+
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 10px 20px;
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                border: 2px solid #ff91a4;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff91a4;
+            }
+        """
+        self.save_btn.setStyleSheet(button_style)
+        self.cancel_btn.setStyleSheet(button_style)
 
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
@@ -621,21 +912,56 @@ class TaskNotificationDialog(QDialog):
     def initUI(self):
         self.setWindowTitle("Настройка уведомлений для задачи")
         self.resize(400, 250)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+        """)
 
         layout = QVBoxLayout()
 
         # группа настроек уведомлений
         notification_group = QGroupBox("Настройки уведомлений")
+        notification_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #e6f3ff;
+                border: 2px solid #87ceeb;
+                border-radius: 8px;
+                padding: 10px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #2c3e50;
+            }
+        """)
+
         notification_layout = QVBoxLayout()
 
         # включение уведомлений
         self.enable_checkbox = QCheckBox("Включить уведомления")
+        self.enable_checkbox.setStyleSheet("font-size: 14px; color: #2c3e50;")
         self.enable_checkbox.setChecked(True)
 
         # количество напоминаний в день
         reminders_layout = QHBoxLayout()
-        reminders_layout.addWidget(QLabel("Напоминаний в день:"))
+        reminders_label = QLabel("Напоминаний в день:")
+        reminders_label.setStyleSheet("font-size: 14px; color: #2c3e50;")
+        reminders_layout.addWidget(reminders_label)
+
         self.reminders_spin = QSpinBox()
+        self.reminders_spin.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 1px solid #b0e0e6;
+            border-radius: 4px;
+            padding: 4px;
+        """)
         self.reminders_spin.setRange(1, 5)
         self.reminders_spin.setValue(1)
         reminders_layout.addWidget(self.reminders_spin)
@@ -643,8 +969,18 @@ class TaskNotificationDialog(QDialog):
 
         # период напоминаний
         period_layout = QHBoxLayout()
-        period_layout.addWidget(QLabel("Период:"))
+        period_label = QLabel("Период:")
+        period_label.setStyleSheet("font-size: 14px; color: #2c3e50;")
+        period_layout.addWidget(period_label)
+
         self.period_combo = QComboBox()
+        self.period_combo.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 1px solid #b0e0e6;
+            border-radius: 4px;
+            padding: 4px;
+        """)
         self.period_combo.addItems(["1 день", "3 дня", "Неделя", "Месяц"])
         period_layout.addWidget(self.period_combo)
         period_layout.addStretch()
@@ -658,6 +994,23 @@ class TaskNotificationDialog(QDialog):
         buttons_layout = QHBoxLayout()
         self.save_btn = QPushButton("Сохранить")
         self.cancel_btn = QPushButton("Отмена")
+
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 10px 20px;
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                border: 2px solid #ff91a4;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff91a4;
+            }
+        """
+        self.save_btn.setStyleSheet(button_style)
+        self.cancel_btn.setStyleSheet(button_style)
 
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
@@ -687,12 +1040,24 @@ class TaskTypeDialog(QWidget):
     def initUI(self):
         self.setWindowTitle("Выбор типа задачи")
         self.resize(300, 200)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+        """)
+
         layout = QVBoxLayout()
 
         # заголовок
         title_label = QLabel("Какую задачу вы хотите создать?")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 20px;")
+        title_label.setStyleSheet("""
+            font-weight: bold; 
+            font-size: 16px; 
+            margin-bottom: 20px;
+            color: #2c3e50;
+        """)
 
         # кнопки выбора типа задачи 5
         self.btn_basic = QPushButton('📝 Задача-база')
@@ -704,27 +1069,31 @@ class TaskTypeDialog(QWidget):
 
         self.btn_basic.setStyleSheet("""
             QPushButton {
-                font-size: 12px;
-                padding: 10px;
-                background-color: rgb(0, 0, 255);
-                border: 2px solid #90caf9;
-                border-radius: 5px;
+                font-size: 14px;
+                padding: 15px;
+                background-color: #b0e0e6;
+                color: #2c3e50;
+                border: 2px solid #87ceeb;
+                border-radius: 10px;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #bbdefb;
+                background-color: #87ceeb;
             }
         """)
 
         self.btn_goal.setStyleSheet("""
             QPushButton {
-                font-size: 12px;
-                padding: 10px;
-                background-color: rgb(0, 0, 255);
-                border: 2px solid #ce93d8;
-                border-radius: 5px;
+                font-size: 14px;
+                padding: 15px;
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                border: 2px solid #ff91a4;
+                border-radius: 10px;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #e1bee7;
+                background-color: #ff91a4;
             }
         """)
 
@@ -772,17 +1141,50 @@ class CalendarApp_2(QWidget):
             self.setWindowTitle("Создание задачи-базы")
 
         self.resize(400, 200)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+        """)
+
         layout = QVBoxLayout()
 
         # ввод задачи
         self.name_label = QLabel("Введите название задачи:")
+        self.name_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;")
+
         self.name_input = QLineEdit()
         self.name_input.setText(self.old_task)
+        self.name_input.setStyleSheet("""
+            font-size: 14px; 
+            padding: 10px;
+            background-color: #ffffff;
+            border: 2px solid #b0e0e6;
+            border-radius: 8px;
+        """)
 
         # кнопки 6
         buttons_layout = QHBoxLayout()
         self.save_btn = QPushButton("Сохранить")
         self.cancel_btn = QPushButton("Отмена")
+
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 10px 20px;
+                background-color: #ffb6c1;
+                color: #2c3e50;
+                border: 2px solid #ff91a4;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff91a4;
+            }
+        """
+        self.save_btn.setStyleSheet(button_style)
+        self.cancel_btn.setStyleSheet(button_style)
 
         self.save_btn.clicked.connect(self.save_task)
         self.cancel_btn.clicked.connect(self.close)
@@ -837,30 +1239,82 @@ class GoalTaskDialog(QWidget):
             reason_text = ""
 
         self.resize(500, 550)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+            }
+        """)
+
         layout = QVBoxLayout()
 
         # ввод цели
         self.goal_label = QLabel("Сформулируйте вашу цель одним предложением:")
+        self.goal_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;")
+
         self.goal_input = QTextEdit()
         self.goal_input.setPlainText(goal_text)
         self.goal_input.setPlaceholderText("Например: Я хочу выучить английский язык на уровне B1 к концу этого года")
         self.goal_input.setMaximumHeight(80)
+        self.goal_input.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 2px solid #b0e0e6;
+            border-radius: 8px;
+            padding: 8px;
+        """)
 
         # ввод причины
         self.reason_label = QLabel("Почему это важно для вас? (сформулируйте одним предложением) *")
+        self.reason_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2c3e50;")
+
         self.reason_input = QTextEdit()
         self.reason_input.setPlainText(reason_text)
         self.reason_input.setPlaceholderText(
             "Например: Это поможет мне получить повышение на работе и свободно общаться в путешествиях")
         self.reason_input.setMaximumHeight(80)
+        self.reason_input.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 2px solid #b0e0e6;
+            border-radius: 8px;
+            padding: 8px;
+        """)
 
         # период цели
         period_group = QGroupBox("Период цели")
+        period_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #e6f3ff;
+                border: 2px solid #87ceeb;
+                border-radius: 8px;
+                padding: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #2c3e50;
+            }
+        """)
+
         period_layout = QVBoxLayout()
 
         duration_layout = QHBoxLayout()
-        duration_layout.addWidget(QLabel("Длительность:"))
+        duration_label = QLabel("Длительность:")
+        duration_label.setStyleSheet("font-size: 14px; color: #2c3e50;")
+        duration_layout.addWidget(duration_label)
+
         self.duration_combo = QComboBox()
+        self.duration_combo.setStyleSheet("""
+            font-size: 14px;
+            background-color: #ffffff;
+            border: 1px solid #b0e0e6;
+            border-radius: 4px;
+            padding: 4px;
+        """)
         self.duration_combo.addItems(["2 месяца", "3 месяца", "6 месяцев", "1 год"])
         duration_layout.addWidget(self.duration_combo)
         duration_layout.addStretch()
@@ -870,13 +1324,31 @@ class GoalTaskDialog(QWidget):
 
         # настройки уведомлений
         notification_group = QGroupBox("Настройки уведомлений")
+        notification_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                background-color: #fff0f5;
+                border: 2px solid #ffb6c1;
+                border-radius: 8px;
+                padding: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: #2c3e50;
+            }
+        """)
+
         notification_layout = QVBoxLayout()
 
         self.notification_checkbox = QCheckBox("Включить ежедневные напоминания")
+        self.notification_checkbox.setStyleSheet("font-size: 14px; color: #2c3e50;")
         self.notification_checkbox.setChecked(True)
 
         notification_hint = QLabel("Вы будете получать напоминания о цели и причине её важности")
-        notification_hint.setStyleSheet("color: #666; font-size: 10px;")
+        notification_hint.setStyleSheet("color: #7f8c8d; font-size: 12px;")
 
         notification_layout.addWidget(self.notification_checkbox)
         notification_layout.addWidget(notification_hint)
@@ -885,15 +1357,32 @@ class GoalTaskDialog(QWidget):
         # подсказки (для правильной формулировки)
         goal_hint = QLabel(
             "* Цель должна быть сформулирована одним полным предложением (не словом или словосочетанием)")
-        goal_hint.setStyleSheet("color: #666; font-size: 10px;")
+        goal_hint.setStyleSheet("color: #7f8c8d; font-size: 12px;")
 
         reason_hint = QLabel("* Причина должна быть сформулирована одним полным предложением")
-        reason_hint.setStyleSheet("color: #666; font-size: 10px;")
+        reason_hint.setStyleSheet("color: #7f8c8d; font-size: 12px;")
 
         # кнопки 7
         buttons_layout = QHBoxLayout()
         self.save_btn = QPushButton("Сохранить цель")
         self.cancel_btn = QPushButton("Отмена")
+
+        button_style = """
+            QPushButton {
+                font-size: 14px; 
+                padding: 10px 20px;
+                background-color: #ffb6c1;
+                color: #ff506a;
+                border: 2px solid #ff91a4;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #ff91a4;
+            }
+        """
+        self.save_btn.setStyleSheet(button_style)
+        self.cancel_btn.setStyleSheet(button_style)
 
         self.save_btn.clicked.connect(self.save_goal_task)
         self.cancel_btn.clicked.connect(self.close)
